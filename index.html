@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MebelAI — Qiymət Proqnozu</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0b0b11;
+      --surface:   #111119;
+      --card:      #16161f;
+      --border:    #222232;
+      --gold:      #d4af37;
+      --gold-dim:  #a88a20;
+      --cyan:      #00e5ff;
+      --text:      #ddd;
+      --muted:     #888;
+      --radius:    14px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Ambient noise grain overlay ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none; z-index: 0; opacity: 0.55;
+    }
+
+    /* ── Glowing orbs ── */
+    .orb {
+      position: fixed; border-radius: 50%;
+      filter: blur(90px); pointer-events: none; z-index: 0;
+    }
+    .orb-1 { width: 520px; height: 520px; background: rgba(212,175,55,.07); top: -180px; left: -140px; }
+    .orb-2 { width: 400px; height: 400px; background: rgba(0,229,255,.05); bottom: -100px; right: -80px; }
+
+    /* ── Header ── */
+    header {
+      position: relative; z-index: 10;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 28px 48px;
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(10px);
+      background: rgba(11,11,17,.6);
+    }
+    .logo-wrap { display: flex; align-items: center; }
+    .badge {
+      font-size: .7rem; letter-spacing: .14em; text-transform: uppercase;
+      color: var(--muted); border: 1px solid var(--border);
+      padding: 5px 14px; border-radius: 999px;
+    }
+
+    /* ── Hero ── */
+    .hero {
+      position: relative; z-index: 5;
+      text-align: center; padding: 72px 24px 40px;
+    }
+    .hero-label {
+      display: inline-block;
+      font-size: .72rem; letter-spacing: .2em; text-transform: uppercase;
+      color: var(--gold); border: 1px solid rgba(212,175,55,.3);
+      padding: 5px 18px; border-radius: 999px; margin-bottom: 22px;
+      animation: fadeUp .6s ease both;
+    }
+    .hero h1 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(2.4rem, 6vw, 4rem);
+      font-weight: 600; line-height: 1.15;
+      color: #f0ead6;
+      animation: fadeUp .7s .1s ease both;
+    }
+    .hero h1 em { color: var(--gold); font-style: normal; }
+    .hero p {
+      margin: 16px auto 0; max-width: 480px;
+      color: var(--muted); font-size: .95rem; line-height: 1.7;
+      animation: fadeUp .7s .2s ease both;
+    }
+
+    /* ── Main layout ── */
+    .main {
+      position: relative; z-index: 5;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px; max-width: 1060px;
+      margin: 0 auto; padding: 32px 24px 80px;
+    }
+    @media (max-width: 780px) { .main { grid-template-columns: 1fr; } }
+
+    /* ── Card ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 36px 32px;
+      animation: fadeUp .7s .3s ease both;
+      position: relative; overflow: hidden;
+    }
+    .card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--gold), transparent);
+      opacity: .5;
+    }
+    .card-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.25rem; font-weight: 600;
+      color: var(--gold); margin-bottom: 28px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .card-title svg { flex-shrink: 0; }
+
+    /* ── Form elements ── */
+    .field { margin-bottom: 20px; }
+    label {
+      display: block;
+      font-size: .78rem; letter-spacing: .1em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 8px;
+    }
+    select, input[type="number"], input[type="range"] {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 9px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: .92rem;
+      padding: 11px 16px;
+      outline: none;
+      transition: border-color .25s, box-shadow .25s;
+      appearance: none;
+    }
+    select:focus, input[type="number"]:focus {
+      border-color: var(--gold-dim);
+      box-shadow: 0 0 0 3px rgba(212,175,55,.12);
+    }
+    select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 14px center;
+      padding-right: 40px; cursor: pointer;
+    }
+    select option { background: #111; }
+
+    /* Range slider */
+    input[type="range"] {
+      padding: 0; height: 4px; cursor: pointer;
+      accent-color: var(--gold);
+      border: none; background: var(--border);
+    }
+    .range-row { display: flex; align-items: center; gap: 14px; }
+    .range-val {
+      min-width: 36px; text-align: center;
+      font-size: .92rem; color: var(--gold);
+      font-weight: 500; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 7px;
+      padding: 6px 8px;
+    }
+
+    /* Quality buttons */
+    .quality-group { display: flex; gap: 10px; flex-wrap: wrap; }
+    .q-btn {
+      flex: 1; min-width: 70px;
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--muted); border-radius: 9px;
+      padding: 10px 6px; font-size: .82rem;
+      cursor: pointer; text-align: center;
+      transition: all .2s; font-family: 'DM Sans', sans-serif;
+    }
+    .q-btn:hover { border-color: var(--gold-dim); color: var(--gold); }
+    .q-btn.active { background: rgba(212,175,55,.12); border-color: var(--gold); color: var(--gold); }
+
+    /* Submit */
+    .btn-submit {
+      width: 100%; margin-top: 10px;
+      background: linear-gradient(135deg, #c9a227 0%, #e8c84a 50%, #c9a227 100%);
+      background-size: 200% 100%; background-position: 0 0;
+      border: none; border-radius: 11px;
+      color: #0b0b11; font-family: 'DM Sans', sans-serif;
+      font-size: .95rem; font-weight: 600;
+      letter-spacing: .04em; padding: 15px;
+      cursor: pointer;
+      transition: background-position .4s, transform .15s, box-shadow .3s;
+      box-shadow: 0 4px 24px rgba(212,175,55,.18);
+    }
+    .btn-submit:hover {
+      background-position: 100% 0;
+      transform: translateY(-1px);
+      box-shadow: 0 8px 36px rgba(212,175,55,.28);
+    }
+    .btn-submit:active { transform: translateY(0); }
+
+    /* ── Result card ── */
+    .result-card {
+      animation: fadeUp .7s .4s ease both;
+    }
+    .result-empty {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      height: 100%; min-height: 260px;
+      text-align: center; gap: 12px;
+    }
+    .result-empty svg { opacity: .25; }
+    .result-empty p { color: var(--muted); font-size: .9rem; max-width: 200px; line-height: 1.6; }
+
+    .result-price {
+      text-align: center; margin-bottom: 28px;
+    }
+    .result-price .label {
+      font-size: .72rem; letter-spacing: .2em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 8px;
+    }
+    .result-price .amount {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 3.4rem; font-weight: 700;
+      color: var(--gold);
+      line-height: 1;
+    }
+    .result-price .currency {
+      font-size: 1.2rem; color: var(--muted); margin-left: 4px;
+    }
+
+    .pulse-ring {
+      width: 100px; height: 100px;
+      border-radius: 50%; margin: 0 auto 24px;
+      display: flex; align-items: center; justify-content: center;
+      position: relative;
+      background: rgba(212,175,55,.08);
+      border: 1px solid rgba(212,175,55,.2);
+    }
+    .pulse-ring::after {
+      content: '';
+      position: absolute; inset: -8px;
+      border-radius: 50%; border: 1px solid rgba(212,175,55,.15);
+      animation: pulse 2s ease infinite;
+    }
+
+    .graph-wrap {
+      border-radius: 10px; overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .graph-wrap img {
+      width: 100%; display: block;
+      border-radius: 10px;
+    }
+
+    /* ── Divider ── */
+    .divider {
+      display: flex; align-items: center; gap: 12px;
+      margin: 20px 0; color: var(--muted); font-size: .75rem;
+    }
+    .divider::before, .divider::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+
+    /* ── Footer ── */
+    footer {
+      position: relative; z-index: 5;
+      text-align: center; padding: 24px;
+      border-top: 1px solid var(--border);
+      color: var(--muted); font-size: .78rem;
+    }
+    footer strong { color: var(--gold-dim); }
+
+    /* ── Animations ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(22px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0; transform: scale(1.45); }
+    }
+    @keyframes shimmer {
+      from { opacity: .6; }
+      to   { opacity: 1; }
+    }
+    .amount { animation: shimmer 2.5s ease infinite alternate; }
+  </style>
+</head>
+<body>
+
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+
+<!-- Header -->
+<header>
+  <div class="logo-wrap">
+    <svg width="280" height="48" viewBox="0 0 280 48" xmlns="http://www.w3.org/2000/svg">
+      <!-- Kreslo silüeti -->
+      <!-- seat -->
+      <rect x="8"  y="28" width="46" height="11" rx="3" fill="none" stroke="#d4af37" stroke-width="1.8"/>
+      <!-- back -->
+      <rect x="8"  y="16" width="46" height="14" rx="3" fill="none" stroke="white" stroke-width="1.5"/>
+      <!-- left arm -->
+      <rect x="2"  y="20" width="7"  height="19" rx="3" fill="none" stroke="#d4af37" stroke-width="1.4"/>
+      <!-- right arm -->
+      <rect x="53" y="20" width="7"  height="19" rx="3" fill="none" stroke="#d4af37" stroke-width="1.4"/>
+      <!-- legs -->
+      <line x1="14" y1="39" x2="12" y2="47" stroke="white" stroke-width="1.6" stroke-linecap="round"/>
+      <line x1="48" y1="39" x2="50" y2="47" stroke="white" stroke-width="1.6" stroke-linecap="round"/>
+      <!-- AI synapse dots above chair -->
+      <circle cx="20" cy="9"  r="2.5" fill="none" stroke="#d4af37" stroke-width="1.4"/>
+      <circle cx="31" cy="4"  r="3"   fill="#d4af37" opacity="0.95"/>
+      <circle cx="42" cy="9"  r="2.5" fill="none" stroke="white"   stroke-width="1.4"/>
+      <line x1="22" y1="9" x2="28" y2="5.5" stroke="#d4af37" stroke-width="1"   opacity="0.75"/>
+      <line x1="34" y1="5.5" x2="40" y2="9" stroke="white"   stroke-width="1"   opacity="0.75"/>
+      <!-- Wordmark -->
+      <text x="74" y="32" font-family="Georgia,'Times New Roman',serif"
+            font-size="22" font-weight="700" fill="white" letter-spacing="1">Synap</text>
+      <text x="158" y="32" font-family="Georgia,'Times New Roman',serif"
+            font-size="22" font-weight="400" fill="#d4af37" letter-spacing="1">Deco</text>
+      <!-- underline accent -->
+      <rect x="74" y="36" width="84" height="1.2" rx="0.6" fill="#d4af37" opacity="0.45"/>
+    </svg>
+  </div>
+  <div class="badge">Süni İntellekt · Qiymət Analizi</div>
+</header>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-label">✦ Machine Learning ilə Gücləndirilmiş</div>
+  <h1>Mebel qiyməti<br><em>anında proqnoz</em></h1>
+  <p>Növ, marka, reytinq və keyfiyyəti seçin — alqoritm bazar qiymətini sizin üçün hesablasın.</p>
+</section>
+
+<!-- Main Grid -->
+<div class="main">
+
+  <!-- Form Card -->
+  <div class="card">
+    <div class="card-title">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+      </svg>
+      Mebel Parametrləri
+    </div>
+
+    <form method="POST" action="/" id="mainForm">
+      <div class="field">
+        <label>Mebel Növü</label>
+        <select name="mebel_novu" required>
+          <option value="">— Seçin —</option>
+          <option value="yataq">🛏 Yataq</option>
+          <option value="skaf">🗄 Skaf</option>
+          <option value="masa">🪑 Masa</option>
+          <option value="divan">🛋 Divan</option>
+          <option value="kreslo">💺 Kreslo</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Marka</label>
+        <select name="marka" required>
+          <option value="">— Seçin —</option>
+          <option value="ikea">IKEA</option>
+          <option value="dogtas">Doğtaş</option>
+          <option value="saloglu">Saloğlu</option>
+          <option value="premium">Premium</option>
+          <option value="yerli">Yerli İstehsal</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Reytinq (1–10)</label>
+        <div class="range-row">
+          <input type="range" name="reytinq" id="reytinqRange"
+                 min="1" max="10" step="0.5" value="7"
+                 oninput="document.getElementById('rVal').textContent=this.value">
+          <div class="range-val" id="rVal">7</div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Keyfiyyət Sinfi</label>
+        <input type="hidden" name="keyfiyyet" id="keyfiyyetHidden" value="2">
+        <div class="quality-group">
+          <button type="button" class="q-btn" onclick="setQ(1,this)">⭐ Əsas</button>
+          <button type="button" class="q-btn active" onclick="setQ(2,this)">⭐⭐ Orta</button>
+          <button type="button" class="q-btn" onclick="setQ(3,this)">⭐⭐⭐ Premium</button>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-submit">
+        ✦ Qiyməti Hesabla
+      </button>
+      {% if error_msg %}
+      <div style="margin-top:14px;padding:11px 16px;background:rgba(220,60,60,.1);border:1px solid rgba(220,60,60,.3);border-radius:9px;color:#f08080;font-size:.85rem;">⚠ {{ error_msg }}</div>
+      {% endif %}
+    </form>
+  </div>
+
+  <!-- Result Card -->
+  <div class="card result-card">
+    <div class="card-title">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+      Nəticə & Analiz
+    </div>
+
+    {% if prediction %}
+      <div class="result-price">
+        <div class="label">Proqnoz Edilən Bazar Qiyməti</div>
+        <div class="amount">{{ prediction }}<span class="currency">AZN</span></div>
+      </div>
+
+      <div class="divider">Bazar Analizi Qrafiki</div>
+
+      {% if timestamp %}
+      <div class="graph-wrap">
+        <img src="/static/graph.png?t={{ timestamp }}" alt="Bazar Analizi Qrafiki">
+      </div>
+      {% endif %}
+
+    {% else %}
+      <div class="result-empty">
+        <div class="pulse-ring">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.4">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 6v6l4 2"/>
+          </svg>
+        </div>
+        <p>Parametrləri seçib hesabla düyməsinə basın.</p>
+      </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<footer>
+  <strong>MebelAI</strong> · SGD Regression Model · Scikit-learn + Flask
+</footer>
+
+<script>
+  function setQ(val, el) {
+    document.getElementById('keyfiyyetHidden').value = val;
+    document.querySelectorAll('.q-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+  }
+</script>
+
+</body>
+</html>
